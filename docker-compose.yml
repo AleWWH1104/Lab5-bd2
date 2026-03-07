@@ -1,0 +1,127 @@
+# ── Plantilla común para todos los servicios de Airflow ───────────────────────
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.2
+  env_file:
+    - .env
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'lab05_secret_key_uvg'
+    # Paquetes extra que Airflow instala al arrancar
+    _PIP_ADDITIONAL_REQUIREMENTS: 'pymongo[srv] pandas sqlalchemy psycopg2-binary python-dotenv'
+    # Conexiones a las fuentes y al warehouse (leídas desde .env)
+    POSTGRES_SOURCE_CONN: postgresql+psycopg2://${PG_SOURCE_USER}:${PG_SOURCE_PASS}@postgres-source:5432/${PG_SOURCE_DB}
+    WAREHOUSE_CONN: postgresql+psycopg2://${PG_WH_USER}:${PG_WH_PASS}@postgres-warehouse:5432/${PG_WH_DB}
+    MONGO_URI: ${MONGO_URI}
+    MONGO_DB: ${MONGO_DB}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-depends
+    postgres-airflow:
+      condition: service_healthy
+    postgres-source:
+      condition: service_healthy
+    postgres-warehouse:
+      condition: service_healthy
+
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+
+  # ── Base de datos de metadatos de Airflow ──────────────────────────────────
+  postgres-airflow:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-airflow-vol:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PostgreSQL fuente (datos SQL del lab) ─────────────────────────────────
+  postgres-source:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${PG_SOURCE_USER}
+      POSTGRES_PASSWORD: ${PG_SOURCE_PASS}
+      POSTGRES_DB: ${PG_SOURCE_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-source-vol:/var/lib/postgresql/data
+      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_SOURCE_USER} -d ${PG_SOURCE_DB}"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PostgreSQL warehouse (destino del ETL) ────────────────────────────────
+  postgres-warehouse:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${PG_WH_USER}
+      POSTGRES_PASSWORD: ${PG_WH_PASS}
+      POSTGRES_DB: ${PG_WH_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-warehouse-vol:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_WH_USER} -d ${PG_WH_DB}"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Inicialización de Airflow (corre una sola vez) ────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname Admin
+          --role Admin
+          --email admin@lab05.local
+      "
+    restart: "no"
+
+  # ── Scheduler de Airflow ──────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: unless-stopped
+
+  # ── Webserver de Airflow (UI en http://localhost:8080) ────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-airflow-vol:
+  postgres-source-vol:
+  postgres-warehouse-vol:
