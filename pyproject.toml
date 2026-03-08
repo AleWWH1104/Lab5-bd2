@@ -1,0 +1,12 @@
+[project]
+name = "lab05-bd2"
+version = "0.1.0"
+description = "Lab 05 - SQL + NoSQL | CC3089 Base de Datos 2, UVG"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg2-binary>=2.9.0",
+    "pymongo[srv]>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "pandas>=2.0.0",
+    "sqlalchemy>=2.0.0",
+]
