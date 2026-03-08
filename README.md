@@ -78,7 +78,7 @@ uv run python scripts/load_mongo.py
 Verifica con mongosh (solo para MongoDB local):
 
 ```bash
-mongosh "mongodb://labuser:labpass@localhost:27017/?authSource=admin" --eval "use lab5_db; db.costos_turisticos.countDocuments()"
+mongosh "mongodb://labuser:labpass@localhost:27017/lab5_db?authSource=admin" --eval "db.costos_turisticos.countDocuments()"
 ```
 
 ### 4. Acceder a Airflow y activar el DAG
