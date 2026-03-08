@@ -86,8 +86,9 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ── MongoDB local (para pruebas sin Atlas) ───────────────────────────────
+  # ── MongoDB local (solo con: docker compose --profile local up) ──────────
   mongodb:
+    profiles: [local]
     image: mongo:latest
     env_file:
       - .env

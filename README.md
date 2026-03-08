@@ -51,6 +51,14 @@ pip install -r requirements.txt
 
 ### 1. Levantar los contenedores Docker
 
+**MongoDB local (desarrollo):**
+
+```bash
+docker compose --profile local up -d
+```
+
+**MongoDB Atlas (producción):** edita `MONGO_URI` en `.env` con tu URI de Atlas y levanta sin el profile:
+
 ```bash
 docker compose up -d
 ```
@@ -61,13 +69,13 @@ docker compose up -d
 uv run python scripts/load_postgres.py
 ```
 
-### 3. Ingestar datos en MongoDB local
+### 3. Ingestar datos en MongoDB
 
 ```bash
 uv run python scripts/load_mongo.py
 ```
 
-Verifica con mongosh que las colecciones tengan datos:
+Verifica con mongosh (solo para MongoDB local):
 
 ```bash
 mongosh "mongodb://labuser:labpass@localhost:27017/?authSource=admin" --eval "use lab5_db; db.costos_turisticos.countDocuments()"
