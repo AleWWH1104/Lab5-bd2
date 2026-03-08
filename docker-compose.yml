@@ -15,11 +15,11 @@ x-airflow-common: &airflow-common
     # Conexiones a las fuentes y al warehouse (leídas desde .env)
     POSTGRES_SOURCE_CONN: postgresql+psycopg2://${PG_SOURCE_USER}:${PG_SOURCE_PASS}@postgres-source:5432/${PG_SOURCE_DB}
     WAREHOUSE_CONN: postgresql+psycopg2://${PG_WH_USER}:${PG_WH_PASS}@postgres-warehouse:5432/${PG_WH_DB}
-    MONGO_URI: ${MONGO_URI}
+    MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/?authSource=admin
     MONGO_DB: ${MONGO_DB}
   volumes:
     - ./dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
+    - airflow-logs-vol:/opt/airflow/logs
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-depends
     postgres-airflow:
@@ -86,20 +86,28 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── MongoDB local (para pruebas sin Atlas) ───────────────────────────────
+  mongodb:
+    image: mongo:latest
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+    ports:
+      - "${MONGO_PORT}:27017"
+    volumes:
+      - mongodb-vol:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ── Inicialización de Airflow (corre una sola vez) ────────────────────────
   airflow-init:
     <<: *airflow-common
-    command: >
-      bash -c "
-        airflow db migrate &&
-        airflow users create
-          --username admin
-          --password admin
-          --firstname Admin
-          --lastname Admin
-          --role Admin
-          --email admin@lab05.local
-      "
+    command: bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@lab05.local"
     restart: "no"
 
   # ── Scheduler de Airflow ──────────────────────────────────────────────────
@@ -125,3 +133,5 @@ volumes:
   postgres-airflow-vol:
   postgres-source-vol:
   postgres-warehouse-vol:
+  mongodb-vol:
+  airflow-logs-vol:
