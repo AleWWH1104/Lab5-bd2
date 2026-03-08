@@ -23,7 +23,7 @@ lab05/
 └── scripts/
     ├── init_postgres.sql       ← DDL tablas fuente (se ejecuta al crear contenedor)
     ├── load_postgres.py        ← Ingesta CSVs → PostgreSQL source
-    ├── load_mongo.py           ← Ingesta JSONs → MongoDB Atlas
+    ├── load_mongo.py           ← Ingesta JSONs → MongoDB local
     ├── queries_insights.sql    ← Queries Ejercicio 3
     └── queries_mongodb.js      ← Queries MongoDB
 ```
@@ -35,44 +35,52 @@ lab05/
 ### Pre-requisitos
 
 - Docker Desktop instalado y corriendo
-- Python 3.9+ con las dependencias: `pip install pandas sqlalchemy psycopg2-binary pymongo[srv] python-dotenv`
-- Cuenta en **MongoDB Atlas** con un cluster creado
+- Python 3.11+ — se recomienda **uv** para gestionar el entorno
 
-### 1. Configurar credenciales
+**Con uv (recomendado):**
 
-Editar `.env` y reemplazar la línea `MONGO_URI` con tu URI real de Atlas:
+```bash
+uv sync          # instala todas las dependencias del pyproject.toml
+```
 
-### 2. Levantar los contenedores Docker
+**Con pip:**
+
+```bash
+pip install -r requirements.txt
+```
+
+### 1. Levantar los contenedores Docker
 
 ```bash
 docker compose up -d
 ```
 
-### 3. Ingestar datos en PostgreSQL source
+### 2. Ingestar datos en PostgreSQL source
 
 ```bash
-python scripts/load_postgres.py
+uv run python scripts/load_postgres.py
 ```
 
-### 4. Ingestar datos en MongoDB Atlas
+### 3. Ingestar datos en MongoDB local
 
 ```bash
-python scripts/load_mongo.py
+uv run python scripts/load_mongo.py
 ```
 
-Verifica desde la UI de Atlas o con mongosh que las colecciones `costos_turisticos` y `paises_big_mac` tengan datos.
+Verifica con mongosh que las colecciones tengan datos:
 
-### 5. Activar el DAG en Airflow
+```bash
+mongosh "mongodb://labuser:labpass@localhost:27017/?authSource=admin" --eval "use lab5_db; db.costos_turisticos.countDocuments()"
+```
+
+### 4. Acceder a Airflow y activar el DAG
+
+- URL: http://localhost:8080
+- Usuario: `admin` / Contraseña: `admin`
 
 ---
 
 ## Ejercicio 1 — ETL con Apache Airflow
-
-### Acceder a Airflow
-
-- URL: http://localhost:8080
-- Usuario: `admin`
-- Contraseña: `admin`
 
 ### Activar el DAG
 
@@ -84,14 +92,13 @@ Verifica desde la UI de Atlas o con mongosh que las colecciones `costos_turistic
 ### Verificar ejecución
 
 ```bash
-# Ver logs del scheduler
-docker logs lab05_airflow_scheduler -f
+docker logs lab5-airflow-scheduler-1 -f
 ```
 
 ### Verificar datos en Warehouse
 
 ```bash
-docker exec -it lab5-bd2-postgres-warehouse-1 psql -U labuser -d warehousedb \
+docker exec -it lab5-postgres-warehouse-1 psql -U labuser -d warehousedb \
   -c "SELECT COUNT(*) FROM fact_turismo_mundial;"
 ```
 
@@ -99,18 +106,14 @@ docker exec -it lab5-bd2-postgres-warehouse-1 psql -U labuser -d warehousedb \
 
 ## Ejercicio 2 — ETL con Python (script standalone)
 
-```bash
-# Instalar dependencias (si es local)
-pip install pymongo psycopg2-binary pandas sqlalchemy
+Requiere que los contenedores Docker estén corriendo (`docker compose up -d`).
 
-# Ejecutar (con Docker corriendo)
+```bash
+# Con uv (recomendado — instala deps automáticamente)
+uv run etl/ejercicio2_etl.py
+
+# Con pip (requiere haber instalado dependencias antes)
 python etl/ejercicio2_etl.py
-```
-
-O desde dentro del contenedor de Airflow:
-
-```bash
-docker exec -it lab05_airflow_webserver python /opt/airflow/etl/ejercicio2_etl.py
 ```
 
 ---
@@ -122,7 +125,7 @@ Ejecutar los queries en `scripts/queries_insights.sql` contra el **Data Warehous
 Conectarse al warehouse:
 
 ```bash
-docker exec -it lab05_postgres_warehouse psql -U labuser -d warehousedb
+docker exec -it lab5-postgres-warehouse-1 psql -U labuser -d warehousedb
 # Luego: \i /ruta/queries_insights.sql
 ```
 
