@@ -2,5 +2,6 @@ logs/
 plugins/
 __pycache__/
 *.pyc
+.env
 .env.local
 .venv/
