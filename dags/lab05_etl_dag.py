@@ -29,7 +29,7 @@ POSTGRES_SOURCE = os.getenv(
 )
 MONGO_URI = os.getenv(
     "MONGO_URI",
-    "mongodb://labuser:labpass@mongo:27017/labdb?authSource=admin"
+    "mongodb://labuser:labpass@mongodb:27017/?authSource=admin"
 )
 WAREHOUSE_CONN = os.getenv(
     "WAREHOUSE_CONN",
